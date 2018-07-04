@@ -1,3 +1,5 @@
+import './scan-line'
+
 export default (state, emitter) => {
   state.document = [
     {type: 'block', parts: [{type: 'text', text: 'Hello world', length: 11}]}
@@ -56,6 +58,8 @@ export default (state, emitter) => {
       render()
       setCaret(state.selection.cache, block, 1)
     } else {
+      let structureHasChanged = false
+
       const part = block.parts[index]
 
       if (partEl.getAttribute('data-part-type') === 'text') {
@@ -65,7 +69,30 @@ export default (state, emitter) => {
         console.error('do not support non-text parts yet')
       }
 
-      // don't render, we are just keeping track for later renders
+      if (structureHasChanged) {
+        render()
+      }
+    }
+  })
+
+  // const nbsp = ' '
+
+  emitter.on('keypress:space', () => {
+    if (state.selection.isCollapsed) {
+      const block = findBlock(state.document, state.selection.focusID)
+      const partIndex = state.selection.focusPart
+      const backset = block.parts.slice(0, partIndex).reduce((acc, p) => p.length + acc, 0)
+      const offset = state.selection.focusOffset - backset
+      const part = block.parts[partIndex]
+      const characterBefore = part.text.substr(offset - 1, 1)
+
+      if (characterBefore === ' ') {
+        // insertAtCursor(nbsp)
+      } else {
+        // insertAtCursor(' ')
+      }
+    } else {
+      console.error("I don't support hitting space with a range selected yet")
     }
   })
 
@@ -122,7 +149,7 @@ function blockLength (block) {
   }
 }
 
-function setCaret (sel, block, pos = 0) {
+function setCaret (sel, block, pos) {
   raf(() => {
     const el = findBlockEl(block)
     const index = findPartIndexAtPos(block, pos)

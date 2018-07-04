@@ -75,15 +75,33 @@ export default (state, emit) => {
 
   function keydown (e) {
     console.debug('keydown', e)
-  }
 
-  function keypress (e) {
-    console.debug('keypress', e)
+    if ((e.code === 'Backspace' || e.code === 'Delete') && !state.selection.isCollapsed) {
+      e.preventDefault()
+      console.error('do not support deleting a range selection yet')
+      return
+    }
 
     if (e.code === 'Enter') {
       e.preventDefault()
       emit('keypress:return')
+      return
     }
+
+    if (e.code === 'Space') {
+      e.preventDefault()
+      emit('keypress:space')
+      return
+    }
+
+    if (e.code === 'KeyV' && e.metaKey === true) {
+      e.preventDefault()
+      console.error('cannot paste yet')
+    }
+  }
+
+  function keypress (e) {
+    console.debug('keypress', e)
   }
 
   function input (e) {
