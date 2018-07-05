@@ -106,7 +106,6 @@ export default (state, emitter) => {
       part.length = text.length
     }
   })
-  // const spaceCharacter = ' '
 
   emitter.on('keypress:return', () => {
     if (state.selection.isCollapsed) {
@@ -160,16 +159,6 @@ export default (state, emitter) => {
   }
 }
 
-// function blockLength (block) {
-//   if (block.parts.length === 0) {
-//     return 0
-//   } else {
-//     return block.parts.reduce((acc, part) => {
-//       return acc + part.length
-//     }, 0)
-//   }
-// }
-
 function setCaret (sel, block, part, pos) {
   const el = findBlockEl(block)
   const partEl = el.querySelector(`[data-part][data-index="${part}"]`)
@@ -178,14 +167,6 @@ function setCaret (sel, block, part, pos) {
 
   sel.collapse(partEl, pos)
 }
-
-// function findBlock (doc, cid) {
-//   return doc.find(b => b._cid === cid)
-// }
-
-// function findBlockIndex (doc, cid) {
-//   return doc.findIndex(b => b._cid === cid)
-// }
 
 function findBlockEl (blockOrID) {
   if (blockOrID._cid) {
