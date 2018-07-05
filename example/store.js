@@ -1,24 +1,25 @@
-import './scan-line'
+import { scanLine } from './scan-line'
 
 export default (state, emitter) => {
   state.document = [
     {
       type: 'block',
       parts: [
-        { type: 'text', text: 'Hello world  ', length: 12 },
-        { type: 'bold', text: '**hooray**', length: 10 }
+        { type: 'text', styleType: 'plain', text: 'Hello world  ', length: 13 },
+        { type: 'text', styleType: 'bold', text: '**hooray**', length: 10 },
+        { type: 'text', styleType: 'plain', text: ' foo * bar', length: 10 }
       ]
     },
     {
       type: 'block',
       parts: [
-        { type: 'text', text: '', length: 0 }
+        { type: 'text', styleType: 'plain', text: '', length: 0 }
       ]
     },
     {
       type: 'block',
       parts: [
-        { type: 'text', text: '    Nathan', length: 10 }
+        { type: 'text', styleType: 'plain', text: '    Nathan', length: 10 }
       ]
     }
   ]
@@ -89,8 +90,6 @@ export default (state, emitter) => {
     if (block.parts.length === 1 && index === 0 && part.text === '') {
       const html = partEl.innerHTML
 
-      console.debug('html', html)
-
       if (text.length > 1 && html.match(nbspRegExp)) {
         text = text.substr(0, text.length - 1)
 
@@ -102,10 +101,91 @@ export default (state, emitter) => {
         })
       }
     } else {
-      part.text = text
-      part.length = text.length
+      const scanResults = scanLine(text)
+      let needToResetBlock = false
+
+      if (scanResults.length === 0) {
+        console.error('scanLine returns zero results which should be impossible')
+      } else if (scanResults.length === 1) {
+        const result = scanResults[0]
+        if (part.styleType !== result.styleType) {
+          needToResetBlock = true
+        }
+      } else {
+        needToResetBlock = true
+      }
+
+      if (needToResetBlock) {
+        const currentPos = currentBlockPos()
+        const oldPartLength = part.length
+
+        part.text = text
+        part.length = text.length
+
+        const lengthDifference = part.length - oldPartLength
+
+        resetBlock(block, currentPos, lengthDifference)
+      } else {
+        part.text = text
+        part.length = text.length
+      }
     }
   })
+
+  function currentBlockPos () {
+    if (state.selection.isCollapsed) {
+      const block = state.selection.focusBlock
+      const index = state.selection.focusPartIndex
+      const offset = block.parts.slice(0, index).reduce((acc, p) => acc + p.length, 0)
+      return offset + state.selection.focusPartOffset
+    } else {
+      console.error('do not support range selections for finding block pos yet')
+    }
+  }
+
+  function findPosInBlock (block, pos) {
+    let part
+    let index
+    let insideOffset = 0
+    let finalOffset = 0
+    let found = false
+
+    for (let i in block.parts) {
+      index = i
+      part = block.parts[index]
+      insideOffset += part.length
+
+      if (pos <= insideOffset) {
+        found = true
+        console.log('pos', pos, 'is less than or equal to', insideOffset)
+        break
+      }
+
+      finalOffset = insideOffset // get ready to loop around
+    }
+
+    if (!found) {
+      console.error('for loop should never fail, but it did')
+    }
+
+    console.log('found pos in block', {part, index, offset: pos - finalOffset})
+
+    return {
+      part,
+      index,
+      offset: pos - finalOffset
+    }
+  }
+
+  function resetBlock (block, currentPos, diff) {
+    block.parts = scanBlock(block)
+
+    let { index, offset } = findPosInBlock(block, currentPos + diff)
+
+    render(() => {
+      setCaret(state.selection.cache, block, index, offset)
+    })
+  }
 
   emitter.on('keypress:return', () => {
     if (state.selection.isCollapsed) {
@@ -159,13 +239,46 @@ export default (state, emitter) => {
   }
 }
 
+function scanBlock (block) {
+  const text = block.parts.map(p => p.text).join('')
+  const expectedLength = block.parts.reduce((acc, p) => acc + p.length, 0)
+
+  if (text.length !== expectedLength) {
+    console.error('the concatted text is not the same length as the calculated combined lengths', text.length, expectedLength)
+  }
+
+  const results = scanLine(text)
+
+  const newParts = []
+
+  results.forEach(style => {
+    newParts.push({
+      type: 'text',
+      styleType: style.styleType,
+      styleSubType: style.styleSubType,
+      text: style.text,
+      length: style.length
+    })
+  })
+
+  return newParts
+}
+
 function setCaret (sel, block, part, pos) {
   const el = findBlockEl(block)
   const partEl = el.querySelector(`[data-part][data-index="${part}"]`)
 
-  console.debug('setting caret', partEl, pos)
+  if (partEl.childNodes.length !== 1) {
+    console.error('this part has more than one text node which means something has gone very wrong')
+  }
 
-  sel.collapse(partEl, pos)
+  const textNode = partEl.childNodes[0]
+
+  console.debug('setting caret', partEl, textNode, pos)
+
+  // must set the selection on the text node and not the part or it will
+  // actually put the cursor in hard to predict places
+  sel.collapse(textNode, pos)
 }
 
 function findBlockEl (blockOrID) {
@@ -222,6 +335,7 @@ function getCurrentSelection () {
 function newTextPart (text) {
   return {
     type: 'text',
+    styleType: 'plain',
     length: text.length,
     text
   }

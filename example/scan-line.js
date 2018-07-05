@@ -1,22 +1,23 @@
 // NOTE: each style regex is required to fully capture itself so it can be inserted into the larger regex
 const styles = [
-  { name: 'code', regex: /((``)(.+?)``)/, captures: 3, tell: { capture: 2, text: '``' }, inner: { capture: 3 } },
-  { name: 'code', regex: /((`)(.+?)`)/, captures: 3, tell: { capture: 2, text: '`' }, inner: { capture: 3 } },
-  { name: 'imageFull', regex: /((!\[)(.+?)(]\()(.+?)\))/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '](' }] },
-  { name: 'linkFull', regex: /((\[)(.+?)(]\()(.+?)\))/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '](' }] },
-  { name: 'imageRef', regex: /((!\[)(.+?)(]\[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '][' }] },
-  { name: 'imageRef', regex: /((!\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '] [' }] },
-  { name: 'linkRef', regex: /((\[)(.+?)(]\[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '][' }] },
-  { name: 'linkRef', regex: /((\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '] [' }] },
-  { name: 'ref', regex: /(^\s*(\[)(.+?)(]:\s)\s*(.+?)$)/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: ']: ' }] },
-  { name: 'autoLink', regex: /((<)(.+?\..+?)>)/, captures: 3, tell: { capture: 2, text: '<' }, inner: { capture: 3 } },
-  { name: 'bold', regex: /((\*\*)(.+?)\*\*)/, captures: 3, tell: { capture: 2, text: '**' }, inner: { capture: 3 } },
-  { name: 'bold', regex: /((__)(.+?)__)/, captures: 3, tell: { capture: 2, text: '__' }, inner: { capture: 3 } },
-  { name: 'italic', regex: /((\*)(.+?)\*)/, captures: 3, tell: { capture: 2, text: '*' }, inner: { capture: 3 } },
-  { name: 'italic', regex: /((_)(.+?)_)/, captures: 3, tell: { capture: 2, text: '_' }, inner: { capture: 3 } }
+  { type: 'code', regex: /((``)(.+?)``)/, captures: 3, tell: { capture: 2, text: '``' }, inner: { capture: 3 } },
+  { type: 'code', regex: /((`)(.+?)`)/, captures: 3, tell: { capture: 2, text: '`' }, inner: { capture: 3 } },
+  { type: 'link', subType: 'imageFull', regex: /((!\[)(.+?)(]\()(.+?)\))/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '](' }] },
+  { type: 'link', subType: 'linkFull', regex: /((\[)(.+?)(]\()(.+?)\))/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '](' }] },
+  { type: 'link', subType: 'imageRef', regex: /((!\[)(.+?)(]\[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '][' }] },
+  { type: 'link', subType: 'imageRef', regex: /((!\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '] [' }] },
+  { type: 'link', subType: 'linkRef', regex: /((\[)(.+?)(]\[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '][' }] },
+  { type: 'link', subType: 'linkRef', regex: /((\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '] [' }] },
+  { type: 'link', subType: 'ref', regex: /(^\s*(\[)(.+?)(]:\s)\s*(.+?)$)/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: ']: ' }] },
+  { type: 'link', subType: 'autoLink', regex: /((<)(.+?\..+?)>)/, captures: 3, tell: { capture: 2, text: '<' }, inner: { capture: 3 } },
+  { type: 'bold', regex: /((\*\*)(.+?)\*\*)/, captures: 3, tell: { capture: 2, text: '**' }, inner: { capture: 3 } },
+  { type: 'bold', regex: /((__)(.+?)__)/, captures: 3, tell: { capture: 2, text: '__' }, inner: { capture: 3 } },
+  { type: 'italic', regex: /((\*)(.+?)\*)/, captures: 3, tell: { capture: 2, text: '*' }, inner: { capture: 3 } },
+  { type: 'italic', regex: /((_)(.+?)_)/, captures: 3, tell: { capture: 2, text: '_' }, inner: { capture: 3 } }
 ]
 
 // TODO:
+// * require spaces around bold and italic and code unless they are up against the edge
 // * backslash escapes (\*foo\* shouldn't match anything)
 
 // assign an offset to each style based on the # of captures preceeding it
@@ -64,7 +65,13 @@ export function scanLine (text) {
 
     if (index > from) {
       const beginningText = text.slice(from, index)
-      results.push({ type: 'plain', text: beginningText, index: 0, length: beginningText.length })
+      results.push({
+        styleType: 'plain',
+        styleSubType: undefined,
+        text: beginningText,
+        index: 0,
+        length: beginningText.length
+      })
     }
 
     let matchedStyle
@@ -76,13 +83,14 @@ export function scanLine (text) {
     }
 
     if (!matchedStyle) {
-      matchedStyle = { name: 'unknown' }
+      matchedStyle = { type: 'unknown' }
     }
 
     const length = matchedCharacters.length
 
     results.push({
-      type: matchedStyle.name,
+      styleType: matchedStyle.type,
+      styleSubType: matchedStyle.subType,
       text: matchedCharacters,
       index,
       length
@@ -99,7 +107,8 @@ export function scanLine (text) {
       const lastText = text.slice(lastIndex)
 
       results.push({
-        type: 'plain',
+        styleType: 'plain',
+        styleSubType: undefined,
         text: lastText,
         index: lastIndex,
         length: lastText.length
@@ -108,7 +117,13 @@ export function scanLine (text) {
 
     return results
   } else {
-    return [{ type: 'text', text, index: 0, length: text.length }]
+    return [{
+      styleType: 'plain',
+      styleSubType: undefined,
+      text,
+      index: 0,
+      length: text.length
+    }]
   }
 }
 

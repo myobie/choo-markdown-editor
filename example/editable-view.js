@@ -20,28 +20,39 @@ const styles = css`
     line-height: 1.3;
     margin: 0;
   }
+
+  :host p pre {
+    white-space: pre-wrap;       /* Since CSS 2.1 */
+    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+    white-space: -pre-wrap;      /* Opera 4-6 */
+    white-space: -o-pre-wrap;    /* Opera 7 */
+    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+  }
 `
+
+function classesForStyle (style) {
+  if (style === 'plain') { return '' }
+  if (style === 'bold') { return 'b' }
+  if (style === 'italic') { return 'i' }
+  if (style === 'link') { return 'u' }
+
+  console.error('do not understand style', style)
+  return ''
+}
 
 function content (block) {
   return block.parts.map((part, index) => {
-    if (part.type === 'text') {
-      let text = part.text
+    let text = part.text
 
-      if (text === '') {
-        text = raw('&nbsp;')
-      }
-
-      return html`
-        <pre class="di" data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${text}</pre>
-      `
-    } else if (part.type === 'bold') {
-      return html`
-        <pre class="di b" data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${part.text}</pre>
-      `
-    } else {
-      console.error('there is no template support for this type of part yet')
-      return ''
+    if (text === '') {
+      text = raw('&nbsp;')
     }
+
+    const additionalClasses = classesForStyle(part.styleType)
+
+    return html`
+      <pre class="di ${additionalClasses}" data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${text}</pre>
+    `
   })
 }
 
@@ -85,6 +96,18 @@ export default (state, emit) => {
     if ((e.code === 'Backspace' || e.code === 'Delete') && !state.selection.isCollapsed) {
       e.preventDefault()
       console.error('do not support deleting a range selection yet')
+      return
+    }
+
+    if (e.code === 'Backspace' && state.selection.anchorPartIndex === 0 && state.selection.anchorPartOffset === 0) {
+      e.preventDefault()
+      console.error('cannot backspace at the left most side of a block yet')
+      return
+    }
+
+    if (e.code === 'Backspace' && state.selection.anchorPartIndex === 0 && state.selection.anchorPartOffset === 1 && state.selection.anchorPart.length === 1) {
+      e.preventDefault()
+      console.error('cannot remove all text in the only part of a block yet')
       return
     }
 
