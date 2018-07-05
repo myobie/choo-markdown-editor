@@ -99,13 +99,13 @@ export default (state, emit) => {
       return
     }
 
-    if (e.code === 'Backspace' && state.selection.anchorPartIndex === 0 && state.selection.anchorPartOffset === 0) {
+    if (e.code === 'Backspace' && state.selection.anchorPartOffset === 0) {
       e.preventDefault()
-      console.error('cannot backspace at the left most side of a block yet')
+      console.error('cannot backspace at the left most side of a part yet')
       return
     }
 
-    if (e.code === 'Backspace' && state.selection.anchorPartIndex === 0 && state.selection.anchorPartOffset === 1 && state.selection.anchorPart.length === 1) {
+    if (e.code === 'Backspace' && state.selection.anchorBlock.parts.length === 1 && state.selection.anchorPartIndex === 0 && state.selection.anchorPartOffset === 1 && state.selection.anchorPart.length === 1) {
       e.preventDefault()
       console.error('cannot remove all text in the only part of a block yet')
       return
