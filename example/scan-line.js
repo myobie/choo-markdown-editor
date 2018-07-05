@@ -10,14 +10,13 @@ const styles = [
   { type: 'link', subType: 'linkRef', regex: /((\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '] [' }] },
   { type: 'link', subType: 'ref', regex: /(^\s*(\[)(.+?)(]:\s)\s*(.+?)$)/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: ']: ' }] },
   { type: 'link', subType: 'autoLink', regex: /((<)(.+?\..+?)>)/, captures: 3, tell: { capture: 2, text: '<' }, inner: { capture: 3 } },
-  { type: 'bold', regex: /((\*\*)(.+?)\*\*)/, captures: 3, tell: { capture: 2, text: '**' }, inner: { capture: 3 } },
-  { type: 'bold', regex: /((__)(.+?)__)/, captures: 3, tell: { capture: 2, text: '__' }, inner: { capture: 3 } },
-  { type: 'italic', regex: /((\*)(.+?)\*)/, captures: 3, tell: { capture: 2, text: '*' }, inner: { capture: 3 } },
-  { type: 'italic', regex: /((_)(.+?)_)/, captures: 3, tell: { capture: 2, text: '_' }, inner: { capture: 3 } }
+  { type: 'bold', regex: /((\*\*)(.+?)\*\*)/, captures: 3, requireSurroundingSpaces: true, tell: { capture: 2, text: '**' }, inner: { capture: 3 } },
+  { type: 'bold', regex: /((__)(.+?)__)/, captures: 3, requireSurroundingSpaces: true, tell: { capture: 2, text: '__' }, inner: { capture: 3 } },
+  { type: 'italic', regex: /((\*)(.+?)\*)/, captures: 3, requireSurroundingSpaces: true, tell: { capture: 2, text: '*' }, inner: { capture: 3 } },
+  { type: 'italic', regex: /((_)(.+?)_)/, captures: 3, requireSurroundingSpaces: true, tell: { capture: 2, text: '_' }, inner: { capture: 3 } }
 ]
 
 // TODO:
-// * require spaces around bold and italic and code unless they are up against the edge
 // * backslash escapes (\*foo\* shouldn't match anything)
 
 // assign an offset to each style based on the # of captures preceeding it
@@ -58,6 +57,27 @@ export function scanLine (text) {
   let results = []
   let from = 0
 
+  function preceededByASpace () {
+    if (results.length === 0) {
+      return true
+    } else {
+      const prevResult = results[results.length - 1]
+      return prevResult.text.startsWith(' ')
+    }
+  }
+
+  function proceededByASpace (match) {
+    const indexAfterEndOfThisMatch = stylesRegex.lastIndex + match[0].length
+
+    if (indexAfterEndOfThisMatch === text.length) {
+      // must be the last match, so it's ok
+      return true
+    } else {
+      const nextChar = text.substr(indexAfterEndOfThisMatch, 1)
+      return nextChar === ' '
+    }
+  }
+
   let match
   while ((match = stylesRegex.exec(text)) !== null) {
     const matchedCharacters = match[0]
@@ -74,29 +94,45 @@ export function scanLine (text) {
       })
     }
 
+    let neededSpaces = false
     let matchedStyle
     for (let style of styles) {
       if (doesMatchStyle(match, style)) {
-        matchedStyle = style
-        break
+        if (style.requireSurroundingSpaces && !preceededByASpace() && !proceededByASpace(match)) {
+          neededSpaces = true
+        } else {
+          // let's go
+          matchedStyle = style
+          break
+        }
       }
     }
 
-    if (!matchedStyle) {
-      matchedStyle = { type: 'unknown' }
+    if (neededSpaces) {
+      // just shove this into the last one since it didn't have a space
+      const prevResult = results[results.length - 1]
+
+      if (prevResult.styleType !== 'plain') {
+        console.error('expected the previous result to be plain, but it was something else', prevResult)
+      }
+
+      prevResult.text += matchedCharacters
+      prevResult.length = prevResult.text.length
+    } else {
+      if (!matchedStyle) {
+        matchedStyle = { type: 'unknown' }
+      }
+
+      results.push({
+        styleType: matchedStyle.type,
+        styleSubType: matchedStyle.subType,
+        text: matchedCharacters,
+        index,
+        length: matchedCharacters.length
+      })
     }
 
-    const length = matchedCharacters.length
-
-    results.push({
-      styleType: matchedStyle.type,
-      styleSubType: matchedStyle.subType,
-      text: matchedCharacters,
-      index,
-      length
-    })
-
-    from = index + length
+    from = index + matchedCharacters.length
   }
 
   if (results.length > 0) {
@@ -115,7 +151,25 @@ export function scanLine (text) {
       })
     }
 
-    return results
+    const finalResults = []
+    let prevResult
+    for (let r of results) {
+      if (prevResult) {
+        if (r.styleType === 'plain' && prevResult.styleType === 'plain') {
+          // combine adjacent plain text parts
+          prevResult.text += r.text
+          prevResult.length = prevResult.text.length
+        } else {
+          finalResults.push(r)
+        }
+      } else {
+        finalResults.push(r)
+      }
+
+      prevResult = r
+    }
+
+    return finalResults
   } else {
     return [{
       styleType: 'plain',

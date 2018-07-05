@@ -34,7 +34,7 @@ function classesForStyle (style) {
   if (style === 'plain') { return '' }
   if (style === 'bold') { return 'b' }
   if (style === 'italic') { return 'i' }
-  if (style === 'link') { return 'u' }
+  if (style === 'link') { return 'underline' }
 
   console.error('do not understand style', style)
   return ''
