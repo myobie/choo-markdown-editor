@@ -2,7 +2,25 @@ import './scan-line'
 
 export default (state, emitter) => {
   state.document = [
-    {type: 'block', parts: [{type: 'text', text: 'Hello world', length: 11}]}
+    {
+      type: 'block',
+      parts: [
+        { type: 'text', text: 'Hello world  ', length: 12 },
+        { type: 'bold', text: '**hooray**', length: 10 }
+      ]
+    },
+    {
+      type: 'block',
+      parts: [
+        { type: 'text', text: '', length: 0 }
+      ]
+    },
+    {
+      type: 'block',
+      parts: [
+        { type: 'text', text: '    Nathan', length: 10 }
+      ]
+    }
   ]
 
   state.selection = null
@@ -28,81 +46,65 @@ export default (state, emitter) => {
 
     // prevent anyone from putting their cursor to the right of the nbsp that
     // is there for empty blocks
-    if (state.selection.isCollapsed && state.selection.focusOffset === 1) {
+    if (state.selection.focusPart === 0 && state.selection.focusPartOffset === 1) {
       const block = findBlock(state.document, state.selection.focusID)
-      console.debug('block', block)
-      if (block.parts.length === 0) {
-        setCaret(state.selection.cache, block, 0)
+
+      // if there is only one part...
+      if (block.parts.length === 1) {
+        const part = block.parts[0]
+
+        // ...and it's empty
+        if (part.text === '') {
+          // move the cursor to the left of the fake nbsp
+          raf(() => {
+            // sel, block, part 0, character 0
+            setCaret(state.selection.cache, block, 0, 0)
+          })
+        }
       }
     }
   })
+
+  const nbspRegExp = /^.+&nbsp;$/
 
   emitter.on('slurp', () => {
     const block = findBlock(state.document, state.selection.focusID)
-    console.debug('block', block)
     const el = findBlockEl(block)
-    console.debug('el', el)
     const index = state.selection.focusPart
-    console.debug('index', index)
+    const part = block.parts[index]
     const partEl = el.querySelector(`[data-part][data-index="${index}"]`)
-    console.debug('partEl', partEl)
+    let text = partEl.innerText
 
-    // If we were empty and this is the first character entered, then make a
-    // new part and re-render to clear the nbsp that is the placeholder for
-    // empty lines
-    if (block.parts.length === 0 && index === 0) {
-      const text = stripSpaces(partEl.innerText)
-      const newPart = newTextPart(text)
-      console.debug('new part', newPart)
-      block.parts.push(newPart)
-      render()
-      setCaret(state.selection.cache, block, 1)
-    } else {
-      let structureHasChanged = false
+    // there is only one empty text part, which means we are rendering it funny
+    if (block.parts.length === 1 && index === 0 && part.text === '') {
+      const html = partEl.innerHTML
 
-      const part = block.parts[index]
+      console.debug('html', html)
 
-      if (partEl.getAttribute('data-part-type') === 'text') {
-        part.text = partEl.innerText
-        part.length = part.text.length
-      } else {
-        console.error('do not support non-text parts yet')
-      }
+      if (text.length > 1 && html.match(nbspRegExp)) {
+        text = text.substr(0, text.length - 1)
 
-      if (structureHasChanged) {
-        render()
-      }
-    }
-  })
+        part.text = text
+        part.length = text.length
 
-  // const nbsp = ' '
-
-  emitter.on('keypress:space', () => {
-    if (state.selection.isCollapsed) {
-      const block = findBlock(state.document, state.selection.focusID)
-      const partIndex = state.selection.focusPart
-      const backset = block.parts.slice(0, partIndex).reduce((acc, p) => p.length + acc, 0)
-      const offset = state.selection.focusOffset - backset
-      const part = block.parts[partIndex]
-      const characterBefore = part.text.substr(offset - 1, 1)
-
-      if (characterBefore === ' ') {
-        // insertAtCursor(nbsp)
-      } else {
-        // insertAtCursor(' ')
+        render(() => {
+          setCaret(state.selection.cache, block, index, text.length)
+        })
       }
     } else {
-      console.error("I don't support hitting space with a range selected yet")
+      part.text = text
+      part.length = text.length
     }
   })
+  // const spaceCharacter = ' '
 
   emitter.on('keypress:return', () => {
     if (state.selection.isCollapsed) {
       const currentBlock = findBlock(state.document, state.selection.focusID)
       const currentLength = blockLength(currentBlock)
 
-      if (currentLength > 0 && state.selection.focusOffset !== currentLength) {
-        console.debug(state.selection.focusOffset, currentLength)
+      if (currentLength > 0 && state.selection.focusPartOffset !== currentLength) {
+        console.debug(state.selection.focusPartOffset, currentLength)
         console.error('do not support splitting blocks with return yet')
         return
       }
@@ -118,8 +120,9 @@ export default (state, emitter) => {
 
       state.document.splice(index + 1, 0, block)
 
-      render()
-      setCaret(state.selection.cache, block, 0)
+      render(() => {
+        setCaret(state.selection.cache, block, 0, 0)
+      })
     } else {
       console.error("I don't support hitting return with a range selected yet")
     }
@@ -134,7 +137,13 @@ export default (state, emitter) => {
     }
   })
 
-  function render () {
+  function render (cb) {
+    if (cb && typeof cb === 'function') {
+      emitter.once(state.events.RENDER, () => {
+        raf(cb)
+      })
+    }
+
     emitter.emit('render')
   }
 }
@@ -149,30 +158,13 @@ function blockLength (block) {
   }
 }
 
-function setCaret (sel, block, pos) {
-  raf(() => {
-    const el = findBlockEl(block)
-    const index = findPartIndexAtPos(block, pos)
-    const partEl = el.querySelector(`[data-part][data-index="${index}"]`)
-    // TODO: pos needs to combine all the part's lengths before the found part
-    sel.collapse(partEl, pos)
-  })
-}
+function setCaret (sel, block, part, pos) {
+  const el = findBlockEl(block)
+  const partEl = el.querySelector(`[data-part][data-index="${part}"]`)
 
-function findPartIndexAtPos (block, pos) {
-  if (block.parts.length === 0) { return 0 }
-  if (pos === 0) { return 0 }
-  if (block.parts.length === 0) { return 0 }
+  console.debug('setting caret', partEl, pos)
 
-  let count = 0
-  for (let i in block.parts) {
-    const p = block.parts[i]
-    count += p.length
-    if (pos <= count) { return i }
-  }
-
-  // This should never happen
-  return block.parts[block.parts.length - 1]
+  sel.collapse(partEl, pos)
 }
 
 function findBlock (doc, cid) {
@@ -181,10 +173,6 @@ function findBlock (doc, cid) {
 
 function findBlockIndex (doc, cid) {
   return doc.findIndex(b => b._cid === cid)
-}
-
-function stripSpaces (string) {
-  return string.replace(/&nbsp;|\u202F|\u00A0|\s/g, '')
 }
 
 function findBlockEl (blockOrID) {
@@ -200,42 +188,38 @@ function raf (cb) {
 }
 
 function getCurrentSelection () {
+  // the understanding is that we are always in a pre tag
+
   const sel = window.getSelection()
 
   const anchorBlockNode = sel.anchorNode.parentNode.closest('[data-block]')
   const anchorPartNode = sel.anchorNode.parentNode.closest('[data-part]')
   const anchorID = anchorBlockNode.getAttribute('data-cid')
   const anchorPart = parseInt(anchorPartNode.getAttribute('data-index'), 10)
-  const anchorOffset = sel.anchorOffset
+  const anchorPartOffset = sel.anchorOffset
 
   const focusBlockNode = sel.focusNode.parentNode.closest('[data-block]')
   const focusPartNode = sel.focusNode.parentNode.closest('[data-part]')
   const focusID = focusBlockNode.getAttribute('data-cid')
   const focusPart = parseInt(focusPartNode.getAttribute('data-index'), 10)
-  const focusOffset = sel.focusOffset
+  const focusPartOffset = sel.focusOffset
 
   const isCollapsed = sel.isCollapsed
-  const isSameNode = isCollapsed || isSameBlockNode(anchorBlockNode, focusBlockNode)
+  const isSameBlock = focusID === anchorID
+  const isSamePart = isSameBlock && focusPart === anchorPart
 
   return {
     anchorID,
     anchorPart,
-    anchorOffset,
+    anchorPartOffset,
     focusID,
     focusPart,
-    focusOffset,
+    focusPartOffset,
     isCollapsed,
-    isSameNode,
+    isSameBlock,
+    isSamePart,
     cache: sel
   }
-}
-
-// function isSameBlock (left, right) {
-//   return left._cid === right._cid
-// }
-
-function isSameBlockNode (left, right) {
-  return left.getAttribute('data-cid') === right.getAttribute('data-cid')
 }
 
 function newTextPart (text) {
@@ -249,7 +233,7 @@ function newTextPart (text) {
 function newEmptyBlock () {
   return {
     type: 'block',
-    parts: [],
+    parts: [newTextPart('')],
     _cid: nextCID()
   }
 }

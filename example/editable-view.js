@@ -23,22 +23,26 @@ const styles = css`
 `
 
 function content (block) {
-  if (block.parts.length === 0) {
-    return html`
-      <span data-part=true data-part-type="text" data-index=0 data-length=0>${raw('&nbsp;')}</span>
-    `
-  } else {
-    return block.parts.map((part, index) => {
-      if (part.type === 'text') {
-        return html`
-          <span data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${part.text}</span>
-        `
-      } else {
-        console.error('there is not template support for parts that are not text yet')
-        return ''
+  return block.parts.map((part, index) => {
+    if (part.type === 'text') {
+      let text = part.text
+
+      if (text === '') {
+        text = raw('&nbsp;')
       }
-    })
-  }
+
+      return html`
+        <pre class="di" data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${text}</pre>
+      `
+    } else if (part.type === 'bold') {
+      return html`
+        <pre class="di b" data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${part.text}</pre>
+      `
+    } else {
+      console.error('there is no template support for this type of part yet')
+      return ''
+    }
+  })
 }
 
 export default (state, emit) => {
@@ -55,9 +59,9 @@ export default (state, emit) => {
       oncompositionupdate=${compositionupdate}
       oncompositionend=${compositionend}
       class=${styles}>
-      ${state.document.map(block => {
+      ${state.document.map((block, index) => {
         return html`
-          <p data-block=true data-cid=${block._cid}>
+          <p data-block=true data-cid=${block._cid} data-index=${index}>
             ${content(block)}
           </p>
         `
@@ -76,6 +80,8 @@ export default (state, emit) => {
   function keydown (e) {
     console.debug('keydown', e)
 
+    // TODO: backspacing the only character will remove the pre, we should do that ourselves and re-render
+
     if ((e.code === 'Backspace' || e.code === 'Delete') && !state.selection.isCollapsed) {
       e.preventDefault()
       console.error('do not support deleting a range selection yet')
@@ -88,11 +94,11 @@ export default (state, emit) => {
       return
     }
 
-    if (e.code === 'Space') {
-      e.preventDefault()
-      emit('keypress:space')
-      return
-    }
+    // if (e.code === 'Space') {
+    //   e.preventDefault()
+    //   emit('keypress:space')
+    //   return
+    // }
 
     if (e.code === 'KeyV' && e.metaKey === true) {
       e.preventDefault()
