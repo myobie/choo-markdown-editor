@@ -1,12 +1,23 @@
 // NOTE: each style regex is required to fully capture itself so it can be inserted into the larger regex
 const styles = [
-  { name: 'code', regex: /((`)(.+?)`)/, captures: 3, tell: { capture: 2, text: '`' } },
-  { name: 'emptyBold', regex: /(\*\*\*\*)/, captures: 1, tell: { capture: 1, text: '****' } },
-  { name: 'bold', regex: /((\*\*)(.+?)\*\*)/, captures: 3, tell: { capture: 2, text: '**' } },
-  { name: 'bold', regex: /((__)(.+?)__)/, captures: 3, tell: { capture: 2, text: '__' } },
-  { name: 'italic', regex: /((\*)(.+?)\*)/, captures: 3, tell: { capture: 2, text: '*' } },
-  { name: 'italic', regex: /((_)(.+?)_)/, captures: 3, tell: { capture: 2, text: '_' } }
+  { name: 'code', regex: /((``)(.+?)``)/, captures: 3, tell: { capture: 2, text: '``' }, inner: { capture: 3 } },
+  { name: 'code', regex: /((`)(.+?)`)/, captures: 3, tell: { capture: 2, text: '`' }, inner: { capture: 3 } },
+  { name: 'imageFull', regex: /((!\[)(.+?)(]\()(.+?)\))/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '](' }] },
+  { name: 'linkFull', regex: /((\[)(.+?)(]\()(.+?)\))/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '](' }] },
+  { name: 'imageRef', regex: /((!\[)(.+?)(]\[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '][' }] },
+  { name: 'imageRef', regex: /((!\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '![' }, { capture: 4, text: '] [' }] },
+  { name: 'linkRef', regex: /((\[)(.+?)(]\[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '][' }] },
+  { name: 'linkRef', regex: /((\[)(.+?)(] \[)(.*?)])/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: '] [' }] },
+  { name: 'ref', regex: /(^\s*(\[)(.+?)(]:\s)\s*(.+?)$)/, captures: 5, tells: [{ capture: 2, text: '[' }, { capture: 4, text: ']: ' }] },
+  { name: 'autoLink', regex: /((<)(.+?\..+?)>)/, captures: 3, tell: { capture: 2, text: '<' }, inner: { capture: 3 } },
+  { name: 'bold', regex: /((\*\*)(.+?)\*\*)/, captures: 3, tell: { capture: 2, text: '**' }, inner: { capture: 3 } },
+  { name: 'bold', regex: /((__)(.+?)__)/, captures: 3, tell: { capture: 2, text: '__' }, inner: { capture: 3 } },
+  { name: 'italic', regex: /((\*)(.+?)\*)/, captures: 3, tell: { capture: 2, text: '*' }, inner: { capture: 3 } },
+  { name: 'italic', regex: /((_)(.+?)_)/, captures: 3, tell: { capture: 2, text: '_' }, inner: { capture: 3 } }
 ]
+
+// TODO:
+// * backslash escapes (\*foo\* shouldn't match anything)
 
 // assign an offset to each style based on the # of captures preceeding it
 let offset = 0
@@ -15,14 +26,30 @@ for (let style of styles) {
   offset += style.captures
 }
 
-console.debug('styles', styles)
-
 // match one of all the things we expect to find
 const stylesRegex = new RegExp(styles.map(style => {
   return style.regex.source
 }).join('|'), 'g')
 
-console.debug('styles regex', stylesRegex)
+function doesMatchStyle (match, style) {
+  if (style.tell) {
+    return doesMatchTell(match, style, style.tell)
+  } else if (style.tells) {
+    return style.tells.every(t => doesMatchTell(match, style, t))
+  } else {
+    return false
+  }
+}
+
+function doesMatchTell (match, style, tell) {
+  const tellIndex = style.offset + tell.capture
+
+  if (match[tellIndex] === tell.text) {
+    return true
+  } else {
+    return false
+  }
+}
 
 export function scanLine (text) {
   if (text.length === 0) { return [] }
@@ -32,8 +59,6 @@ export function scanLine (text) {
 
   let match
   while ((match = stylesRegex.exec(text)) !== null) {
-    console.debug('match', match)
-
     const matchedCharacters = match[0]
     const index = match.index
 
@@ -44,17 +69,11 @@ export function scanLine (text) {
 
     let matchedStyle
     for (let style of styles) {
-      const tellIndex = style.offset + style.tell.capture
-      console.debug('tell index', tellIndex)
-      const value = match[tellIndex]
-      console.debug('value', value)
-      if (value === style.tell.text) {
+      if (doesMatchStyle(match, style)) {
         matchedStyle = style
         break
       }
     }
-
-    console.debug('matched style', matchedStyle)
 
     if (!matchedStyle) {
       matchedStyle = { name: 'unknown' }
