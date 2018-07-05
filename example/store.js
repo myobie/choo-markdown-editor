@@ -42,15 +42,15 @@ export default (state, emitter) => {
   })
 
   emitter.on('selection:update', update => {
-    if (state.selection === null || state.selection.anchorID !== update.anchorID) {
-      update.anchorBlock = findBlock(state.document, update.anchorID)
+    if (state.selection === null || state.selection.anchorBlockID !== update.anchorBlockID) {
+      update.anchorBlock = state.document[update.anchorBlockIndex]
     } else {
       update.anchorBlock = state.selection.anchorBlock
     }
     update.anchorPart = update.anchorBlock.parts[update.anchorPartIndex]
 
-    if (state.selection === null || state.selection.focusID !== update.focusID) {
-      update.focusBlock = findBlock(state.document, update.focusID)
+    if (state.selection === null || state.selection.focusBlockID !== update.focusBlockID) {
+      update.focusBlock = state.document[update.focusBlockIndex]
     } else {
       update.focusBlock = state.selection.focusBlock
     }
@@ -111,16 +111,18 @@ export default (state, emitter) => {
   emitter.on('keypress:return', () => {
     if (state.selection.isCollapsed) {
       const currentBlock = state.selection.focusBlock
-      const currentLength = blockLength(currentBlock)
+      const partIndex = state.selection.focusPartIndex
+      const lastPartIndex = currentBlock.parts.length - 1
+      const partOffset = state.selection.focusPartOffset
+      const currentLength = state.selection.focusPart.length
 
-      if (currentLength > 0 && state.selection.focusPartOffset !== currentLength) {
-        console.debug(state.selection.focusPartOffset, currentLength)
+      if (!(partIndex === lastPartIndex && partOffset === currentLength)) {
         console.error('do not support splitting blocks with return yet')
         return
       }
 
       const block = newEmptyBlock()
-      let index = findBlockIndex(state.document, state.selection.focusID)
+      let index = state.selection.focusBlockIndex
 
       // this should never happen
       if (index === -1) {
@@ -158,15 +160,15 @@ export default (state, emitter) => {
   }
 }
 
-function blockLength (block) {
-  if (block.parts.length === 0) {
-    return 0
-  } else {
-    return block.parts.reduce((acc, part) => {
-      return acc + part.length
-    }, 0)
-  }
-}
+// function blockLength (block) {
+//   if (block.parts.length === 0) {
+//     return 0
+//   } else {
+//     return block.parts.reduce((acc, part) => {
+//       return acc + part.length
+//     }, 0)
+//   }
+// }
 
 function setCaret (sel, block, part, pos) {
   const el = findBlockEl(block)
@@ -177,13 +179,13 @@ function setCaret (sel, block, part, pos) {
   sel.collapse(partEl, pos)
 }
 
-function findBlock (doc, cid) {
-  return doc.find(b => b._cid === cid)
-}
+// function findBlock (doc, cid) {
+//   return doc.find(b => b._cid === cid)
+// }
 
-function findBlockIndex (doc, cid) {
-  return doc.findIndex(b => b._cid === cid)
-}
+// function findBlockIndex (doc, cid) {
+//   return doc.findIndex(b => b._cid === cid)
+// }
 
 function findBlockEl (blockOrID) {
   if (blockOrID._cid) {
@@ -204,25 +206,29 @@ function getCurrentSelection () {
 
   const anchorBlockNode = sel.anchorNode.parentNode.closest('[data-block]')
   const anchorPartNode = sel.anchorNode.parentNode.closest('[data-part]')
-  const anchorID = anchorBlockNode.getAttribute('data-cid')
+  const anchorBlockID = anchorBlockNode.getAttribute('data-cid')
+  const anchorBlockIndex = parseInt(anchorBlockNode.getAttribute('data-index'), 10)
   const anchorPartIndex = parseInt(anchorPartNode.getAttribute('data-index'), 10)
   const anchorPartOffset = sel.anchorOffset
 
   const focusBlockNode = sel.focusNode.parentNode.closest('[data-block]')
   const focusPartNode = sel.focusNode.parentNode.closest('[data-part]')
-  const focusID = focusBlockNode.getAttribute('data-cid')
+  const focusBlockID = focusBlockNode.getAttribute('data-cid')
+  const focusBlockIndex = parseInt(focusBlockNode.getAttribute('data-index'), 10)
   const focusPartIndex = parseInt(focusPartNode.getAttribute('data-index'), 10)
   const focusPartOffset = sel.focusOffset
 
   const isCollapsed = sel.isCollapsed
-  const isSameBlock = focusID === anchorID
+  const isSameBlock = focusBlockID === anchorBlockID
   const isSamePart = isSameBlock && focusPartIndex === anchorPartIndex
 
   return {
-    anchorID,
+    anchorBlockID,
+    anchorBlockIndex,
     anchorPartIndex,
     anchorPartOffset,
-    focusID,
+    focusBlockID,
+    focusBlockIndex,
     focusPartIndex,
     focusPartOffset,
     isCollapsed,
