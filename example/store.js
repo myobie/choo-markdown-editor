@@ -42,23 +42,33 @@ export default (state, emitter) => {
   })
 
   emitter.on('selection:update', update => {
+    if (state.selection === null || state.selection.anchorID !== update.anchorID) {
+      update.anchorBlock = findBlock(state.document, update.anchorID)
+    } else {
+      update.anchorBlock = state.selection.anchorBlock
+    }
+    update.anchorPart = update.anchorBlock.parts[update.anchorPartIndex]
+
+    if (state.selection === null || state.selection.focusID !== update.focusID) {
+      update.focusBlock = findBlock(state.document, update.focusID)
+    } else {
+      update.focusBlock = state.selection.focusBlock
+    }
+    update.focusPart = update.focusBlock.parts[update.focusPartIndex]
+
     state.selection = update
 
     // prevent anyone from putting their cursor to the right of the nbsp that
     // is there for empty blocks
-    if (state.selection.focusPart === 0 && state.selection.focusPartOffset === 1) {
-      const block = findBlock(state.document, state.selection.focusID)
-
+    if (state.selection.focusPartIndex === 0 && state.selection.focusPartOffset === 1) {
       // if there is only one part...
-      if (block.parts.length === 1) {
-        const part = block.parts[0]
-
+      if (state.selection.focusBlock.parts.length === 1) {
         // ...and it's empty
-        if (part.text === '') {
+        if (state.selection.focusPart.text === '') {
           // move the cursor to the left of the fake nbsp
           raf(() => {
             // sel, block, part 0, character 0
-            setCaret(state.selection.cache, block, 0, 0)
+            setCaret(state.selection.cache, state.selection.focusBlock, 0, 0)
           })
         }
       }
@@ -68,10 +78,10 @@ export default (state, emitter) => {
   const nbspRegExp = /^.+&nbsp;$/
 
   emitter.on('slurp', () => {
-    const block = findBlock(state.document, state.selection.focusID)
+    const block = state.selection.focusBlock
     const el = findBlockEl(block)
-    const index = state.selection.focusPart
-    const part = block.parts[index]
+    const index = state.selection.focusPartIndex
+    const part = state.selection.focusPart
     const partEl = el.querySelector(`[data-part][data-index="${index}"]`)
     let text = partEl.innerText
 
@@ -100,7 +110,7 @@ export default (state, emitter) => {
 
   emitter.on('keypress:return', () => {
     if (state.selection.isCollapsed) {
-      const currentBlock = findBlock(state.document, state.selection.focusID)
+      const currentBlock = state.selection.focusBlock
       const currentLength = blockLength(currentBlock)
 
       if (currentLength > 0 && state.selection.focusPartOffset !== currentLength) {
@@ -195,25 +205,25 @@ function getCurrentSelection () {
   const anchorBlockNode = sel.anchorNode.parentNode.closest('[data-block]')
   const anchorPartNode = sel.anchorNode.parentNode.closest('[data-part]')
   const anchorID = anchorBlockNode.getAttribute('data-cid')
-  const anchorPart = parseInt(anchorPartNode.getAttribute('data-index'), 10)
+  const anchorPartIndex = parseInt(anchorPartNode.getAttribute('data-index'), 10)
   const anchorPartOffset = sel.anchorOffset
 
   const focusBlockNode = sel.focusNode.parentNode.closest('[data-block]')
   const focusPartNode = sel.focusNode.parentNode.closest('[data-part]')
   const focusID = focusBlockNode.getAttribute('data-cid')
-  const focusPart = parseInt(focusPartNode.getAttribute('data-index'), 10)
+  const focusPartIndex = parseInt(focusPartNode.getAttribute('data-index'), 10)
   const focusPartOffset = sel.focusOffset
 
   const isCollapsed = sel.isCollapsed
   const isSameBlock = focusID === anchorID
-  const isSamePart = isSameBlock && focusPart === anchorPart
+  const isSamePart = isSameBlock && focusPartIndex === anchorPartIndex
 
   return {
     anchorID,
-    anchorPart,
+    anchorPartIndex,
     anchorPartOffset,
     focusID,
-    focusPart,
+    focusPartIndex,
     focusPartOffset,
     isCollapsed,
     isSameBlock,
