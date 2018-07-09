@@ -22,11 +22,7 @@ const styles = css`
   }
 
   :host p pre {
-    white-space: pre-wrap;       /* Since CSS 2.1 */
-    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
-    white-space: -pre-wrap;      /* Opera 4-6 */
-    white-space: -o-pre-wrap;    /* Opera 7 */
-    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+    white-space: pre-wrap;
   }
 `
 
@@ -40,7 +36,7 @@ function classesForStyle (style) {
   return ''
 }
 
-function content (block) {
+function content (block, emit) {
   return block.parts.map((part, index) => {
     let text = part.text
 
@@ -55,6 +51,30 @@ function content (block) {
     `
   })
 }
+
+function renderBlock (block, index, state, emit) {
+  return html`
+    <p data-block=true data-cid=${block._cid} data-index=${index}>
+      ${content(block, emit)}
+    </p>
+  `
+}
+
+function renderEmptyBlock (block, index, state, emit) {
+  return html`
+    <p onclick=${click} data-block=true data-cid=${block._cid} data-index=${index}>
+      <pre class="di" data-part=true data-part-type="text" data-index="0" data-length="0">${raw('&nbsp;')}</pre>
+    </p>
+  `
+
+  function click (e) {
+    console.debug('click', e)
+    e.preventDefault()
+    emit('caret:set', { block, pos: 0 })
+  }
+}
+
+// TODO: how to use the mutation observer?
 
 export default (state, emit) => {
   return html`
@@ -71,11 +91,11 @@ export default (state, emit) => {
       oncompositionend=${compositionend}
       class=${styles}>
       ${state.document.map((block, index) => {
-        return html`
-          <p data-block=true data-cid=${block._cid} data-index=${index}>
-            ${content(block)}
-          </p>
-        `
+        if (block.parts.length === 1 && block.parts[0].text === '') {
+          return renderEmptyBlock(block, index, state, emit)
+        } else {
+          return renderBlock(block, index, state, emit)
+        }
       })}
     </div>
   `
@@ -91,42 +111,92 @@ export default (state, emit) => {
   function keydown (e) {
     console.debug('keydown', e)
 
-    // TODO: backspacing the only character will remove the pre, we should do that ourselves and re-render
+    const browser = { isMac: true } // TODO: detect browser
 
-    if ((e.code === 'Backspace' || e.code === 'Delete') && !state.selection.isCollapsed) {
+    // https://github.com/ProseMirror/prosemirror-view/blob/master/src/capturekeys.js#L215-L236
+
+    const code = e.code
+    // TODO: assign code from e.keyCode if e.code is missing
+
+    if (code === 'Backspace' || (browser.isMac && code === 'keyH' && e.ctrlKey)) {
       e.preventDefault()
-      console.error('do not support deleting a range selection yet')
+      emit('key:backspace', e)
       return
     }
 
-    if (e.code === 'Backspace' && state.selection.anchorPartOffset === 0) {
+    if (code === 'Delete' || (browser.isMac && code === 'keyD' && e.ctrlKey)) {
       e.preventDefault()
-      console.error('cannot backspace at the left most side of a part yet')
+      emit('key:delete', e)
       return
     }
 
-    if (e.code === 'Backspace' && state.selection.anchorBlock.parts.length === 1 && state.selection.anchorPartIndex === 0 && state.selection.anchorPartOffset === 1 && state.selection.anchorPart.length === 1) {
+    if (code === 'Enter') {
       e.preventDefault()
-      console.error('cannot remove all text in the only part of a block yet')
+      emit('key:return', e)
       return
     }
 
-    if (e.code === 'Enter') {
+    if (code === 'Escape') {
       e.preventDefault()
-      emit('keypress:return')
+      emit('key:escape', e)
       return
     }
 
-    // if (e.code === 'Space') {
-    //   e.preventDefault()
-    //   emit('keypress:space')
-    //   return
-    // }
-
-    if (e.code === 'KeyV' && e.metaKey === true) {
+    if (code === 'ArrowUp') {
       e.preventDefault()
-      console.error('cannot paste yet')
+      emit('key:up', e)
+      return
     }
+
+    if (code === 'ArrowRight') {
+      e.preventDefault()
+      emit('key:right', e)
+      return
+    }
+
+    if (code === 'ArrowDown') {
+      e.preventDefault()
+      emit('key:down', e)
+      return
+    }
+
+    if (code === 'ArrowLeft') {
+      e.preventDefault()
+      emit('key:left', e)
+      return
+    }
+
+    if ((e.code === 'KeyV' && e.ctrlKey) || (browser.isMac && e.code === 'KeyV' && e.metaKey === true)) {
+      e.preventDefault()
+      emit('key:paste', e)
+      return
+    }
+
+    if ((e.code === 'KeyZ' && e.ctrlKey) || (browser.isMac && e.code === 'KeyZ' && e.metaKey === true)) {
+      e.preventDefault()
+      emit('key:undo', e)
+      return
+    }
+
+    if ((e.code === 'KeyY' && e.ctrlKey) || (browser.isMac && e.code === 'KeyY' && e.metaKey === true)) {
+      e.preventDefault()
+      emit('key:redo', e)
+      return
+    }
+
+    if ((e.code === 'KeyB' && e.ctrlKey) || (browser.isMac && e.code === 'KeyB' && e.metaKey === true)) {
+      e.preventDefault()
+      emit('key:bold', e)
+      return
+    }
+
+    if ((e.code === 'KeyI' && e.ctrlKey) || (browser.isMac && e.code === 'KeyI' && e.metaKey === true)) {
+      e.preventDefault()
+      emit('key:italic', e)
+      return
+    }
+
+    // TODO: other keyboard shortcuts for other things
   }
 
   function keypress (e) {

@@ -58,22 +58,10 @@ export default (state, emitter) => {
     update.focusPart = update.focusBlock.parts[update.focusPartIndex]
 
     state.selection = update
+  })
 
-    // prevent anyone from putting their cursor to the right of the nbsp that
-    // is there for empty blocks
-    if (state.selection.focusPartIndex === 0 && state.selection.focusPartOffset === 1) {
-      // if there is only one part...
-      if (state.selection.focusBlock.parts.length === 1) {
-        // ...and it's empty
-        if (state.selection.focusPart.text === '') {
-          // move the cursor to the left of the fake nbsp
-          raf(() => {
-            // sel, block, part 0, character 0
-            setCaret(state.selection.cache, state.selection.focusBlock, 0, 0)
-          })
-        }
-      }
-    }
+  emitter.on('caret:set', ({ block, pos }) => {
+    setCaret(state.selection.cache, block, 0, pos)
   })
 
   const nbspRegExp = /^.+&nbsp;$/
