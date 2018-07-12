@@ -210,6 +210,11 @@ export default (state, emit) => {
 
   function keypress (e) {
     console.debug('keypress', e)
+
+    if (!state.selection.isCollapsed) {
+      e.preventDefault()
+      console.error('cannot input with a range selection')
+    }
   }
 
   function input (e) {
