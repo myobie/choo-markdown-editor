@@ -20,7 +20,9 @@ function rightArrayIncludesOrEqualsLeftArray (recurse, left, right) {
     const rightV = right[i]
 
     if (Array.isArray(leftV) && Array.isArray(rightV)) {
-      return recurse(leftV, rightV)
+      if (recurse(leftV, rightV) === false) {
+        return false
+      }
     } else if (leftV !== rightV) {
       return false
     }

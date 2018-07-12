@@ -59,6 +59,7 @@ export function findPosInBlock (block, pos) {
 
   for (let i in block.parts) {
     index = i
+    // index = parseInt(i, 10)
     part = block.parts[index]
     insideOffset += part.length
 

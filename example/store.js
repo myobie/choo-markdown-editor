@@ -1,7 +1,7 @@
 import { document as testDocument } from './test-document'
 import { raf } from './raf'
-import * as selection from './selection'
-import { keyBackspace, keyReturn } from './keypress'
+import * as sel from './selection'
+import { keyBackspace, keyDelete, keyReturn } from './keypress'
 import { updatePart, reScanBlock } from './model'
 import { replacePart } from './transforms'
 import { isArrayEqual } from './array-utils'
@@ -15,7 +15,7 @@ export default (state, emitter) => {
   emitter.on('focus', () => {
     state.isEditing = true
     raf(() => {
-      emitter.emit('selection:update', selection.current())
+      emitter.emit('selection:update', sel.current(state))
     })
   })
 
@@ -25,12 +25,14 @@ export default (state, emitter) => {
     state.nextSelection = null
   })
 
-  emitter.on('selection:update', update => {
-    selection.updateState(state, update)
+  emitter.on('selection:update', newSelection => {
+    state.selection = newSelection
   })
 
   emitter.on('caret:set', ({ block, pos }) => {
-    selection.setCaret(block, pos)
+    const point = sel.Point.fromBlockPos(block, pos).assignFromDocument(state.document)
+    const selection = new sel.Selection(point)
+    selection.render()
   })
 
   const nbspRegExp = /^.+&nbsp;$/
@@ -40,12 +42,12 @@ export default (state, emitter) => {
       console.error('cannot slurp after input during a range selection yet')
     }
 
-    const block = state.selection.focusBlock
-    const index = state.selection.focusPartIndex
-    const part = state.selection.focusPart
-    const partEl = selection.el(block, index)
-    let text = partEl.innerText
-    const html = partEl.innerHTML
+    const block = state.selection.end.block
+    const index = state.selection.end.partIndex
+    const part = state.selection.end.part
+    const el = state.selection.end.el
+    let text = el.innerText
+    const html = el.innerHTML
 
     if (text.length > 1 && html.match(nbspRegExp)) {
       text = text.substr(0, text.length - 1)
@@ -83,12 +85,17 @@ export default (state, emitter) => {
     render()
   })
 
+  emitter.on('key:delete', () => {
+    keyDelete(state)
+    render()
+  })
+
   // just in case
   document.execCommand('defaultParagraphSeparator', false, 'p')
 
   document.addEventListener('selectionchange', e => {
     if (state.isEditing) {
-      emitter.emit('selection:update', selection.current())
+      emitter.emit('selection:update', sel.current(state))
     }
   })
 
@@ -101,8 +108,15 @@ export default (state, emitter) => {
 
     // if there is a next selection queued up, then go ahead and make it happen
     if (state.nextSelection) {
+      console.debug('will render next selection', state.nextSelection)
       emitter.once(state.events.RENDER, () => {
-        raf(() => { selection.next(state) })
+        const nextSelection = state.nextSelection
+        state.nextSelection = null
+        if (nextSelection) {
+          raf(() => {
+            nextSelection.render()
+          })
+        }
       })
     }
 

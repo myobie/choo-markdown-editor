@@ -1,33 +1,45 @@
-import { blockLength, posInBlockAtPartAndOffset } from './model'
-import { deleteRange, mergeBlocks, splitBlock } from './transforms'
+import { blockLength } from './model'
+import { deleteBlockIndexRange, deleteRange, mergeBlocks, splitBlock } from './transforms'
+import { Point, Selection } from './selection'
 
 export function keyReturn (state) {
-  if (state.selection.isCollapsed) {
-    const block = state.selection.focusBlock
-    const index = state.selection.focusPartIndex
-    const offset = state.selection.focusPartOffset
-    const pos = posInBlockAtPartAndOffset(block, index, offset)
+  if (state.selection.isSameBlock) {
+    const block = state.selection.end.block
+    const beginPos = state.selection.begin.pos
+    const endPos = state.selection.end.pos
 
-    const { newBlock } = splitBlock(state.document, block, pos)
+    const { newBlock } = splitBlock(state.document, block, beginPos, endPos)
 
-    state.nextSelection = {
-      isCollapsed: true,
-      focusBlock: newBlock,
-      focusPartIndex: 0,
-      focusPartOffset: 0
-    }
+    const newPoint = Point.fromBlockPos(newBlock, 0).assignFromDocument(state.document)
+    state.nextSelection = new Selection(newPoint)
   } else {
-    console.error("I don't support hitting return with a range selected yet")
+    const leftBlock = state.selection.begin.block
+    const leftBlockIndex = state.selection.begin.blockIndex
+    const leftPos = state.selection.begin.pos
+    const lastPos = blockLength(leftBlock) - 1
+
+    const rightBlock = state.selection.end.block
+    const rightBlockIndex = state.selection.end.blockIndex
+    const rightPos = state.selection.end.pos
+
+    deleteRange(state.document, leftBlock, leftPos, leftBlock, lastPos)
+    const { newBlock } = deleteRange(state.document, rightBlock, 0, rightBlock, rightPos)
+
+    // remove anything between these two
+    if (leftBlockIndex + 1 <= rightBlockIndex - 1) {
+      deleteBlockIndexRange(state.document, leftBlockIndex + 1, rightBlockIndex - 1)
+    }
+
+    const newPoint = Point.fromBlockPos(newBlock, 0).assignFromDocument(state.document)
+    state.nextSelection = new Selection(newPoint)
   }
 }
 
 export function keyBackspace (state) {
   if (state.selection.isCollapsed) {
-    const block = state.selection.focusBlock
-    const blockIndex = state.selection.focusBlockIndex
-    const index = state.selection.focusPartIndex
-    const offset = state.selection.focusPartOffset
-    const pos = posInBlockAtPartAndOffset(block, index, offset)
+    const block = state.selection.end.block
+    const blockIndex = state.selection.end.blockIndex
+    const pos = state.selection.end.pos
 
     if (pos === 0) {
       if (blockIndex === 0) { return } // do nothing if we are at the beginning of the document
@@ -35,37 +47,54 @@ export function keyBackspace (state) {
       const oldBlock = state.document[blockIndex - 1]
       const { newBlock } = mergeBlocks(state.document, blockIndex - 1, blockIndex)
 
-      state.nextSelection = {
-        isCollapsed: true,
-        focusBlock: newBlock,
-        focusPos: blockLength(oldBlock)
-      }
+      const newPoint = Point.fromBlockPos(newBlock, blockLength(oldBlock)).assignFromDocument(state.document)
+      state.nextSelection = new Selection(newPoint)
     } else {
       const { newBlock } = deleteRange(state.document, block, pos - 1, block, pos)
 
-      state.nextSelection = {
-        isCollapsed: true,
-        focusBlock: newBlock,
-        focusPos: pos - 1
-      }
+      const newPoint = Point.fromBlockPos(newBlock, pos - 1).assignFromDocument(state.document)
+      state.nextSelection = new Selection(newPoint)
     }
   } else {
-    const leftBlock = state.selection.anchorBlock
-    const leftIndex = state.selection.anchorPartIndex
-    const leftOffset = state.selection.anchorPartOffset
-    const leftPos = posInBlockAtPartAndOffset(leftBlock, leftIndex, leftOffset)
-
-    const rightBlock = state.selection.focusBlock
-    const rightIndex = state.selection.focusPartIndex
-    const rightOffset = state.selection.focusPartOffset
-    const rightPos = posInBlockAtPartAndOffset(rightBlock, rightIndex, rightOffset)
-
-    const { newBlock } = deleteRange(state.document, leftBlock, leftPos, rightBlock, rightPos)
-
-    state.nextSelection = {
-      isCollapsed: true,
-      focusBlock: newBlock,
-      focusPos: leftPos
-    }
+    removeSelectedRange(state)
   }
+}
+
+export function keyDelete (state) {
+  if (state.selection.isCollapsed) {
+    const block = state.selection.end.block
+    const lastBlockIndex = state.document.length - 1
+    const lastPos = blockLength(block) - 1
+    const blockIndex = state.selection.end.blockIndex
+    const pos = state.selection.end.pos
+
+    if (pos === lastPos) {
+      if (blockIndex === lastBlockIndex) { return } // do nothing if we are at the end of the document
+
+      const { newBlock } = mergeBlocks(state.document, blockIndex, blockIndex + 1)
+
+      const newPoint = Point.fromBlockPos(newBlock, lastPos).assignFromDocument(state.document)
+      state.nextSelection = new Selection(newPoint)
+    } else {
+      const { newBlock } = deleteRange(state.document, block, pos, block, pos + 1)
+
+      const newPoint = Point.fromBlockPos(newBlock, pos).assignFromDocument(state.document)
+      state.nextSelection = new Selection(newPoint)
+    }
+  } else {
+    removeSelectedRange(state)
+  }
+}
+
+function removeSelectedRange (state) {
+  const leftBlock = state.selection.begin.block
+  const leftPos = state.selection.begin.pos
+
+  const rightBlock = state.selection.end.block
+  const rightPos = state.selection.end.pos
+
+  const { newBlock } = deleteRange(state.document, leftBlock, leftPos, rightBlock, rightPos)
+
+  const newPoint = Point.fromBlockPos(newBlock, leftPos).assignFromDocument(state.document)
+  state.nextSelection = new Selection(newPoint)
 }

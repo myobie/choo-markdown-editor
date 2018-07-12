@@ -16,15 +16,15 @@ export function replaceBlockAt (document, block, index) {
   document.splice(index, 1, block)
 }
 
-export function splitBlock (document, block, pos) {
+export function splitBlock (document, block, beginPos, endPos) {
+  if (endPos === undefined) { endPos = beginPos }
+
   const blockIndex = findBlockIndex(document, block)
-  console.debug({ blockIndex })
   const _text = blockText(block)
 
-  let leftText = _text.slice(0, pos)
-  let rightText = _text.slice(pos)
-
-  console.debug('leftText', leftText, 'rightText', rightText)
+  let leftText = _text.slice(0, beginPos)
+  // the parts between beginPos and endPos are lost
+  let rightText = _text.slice(endPos)
 
   // TODO: scanLine
   // TODO: if a block had a style (like code or bullet) then copy that style
@@ -46,7 +46,6 @@ export function mergeBlocks (document, leftBlockIndex, rightBlockIndex) {
   const rightBlock = document[rightBlockIndex]
 
   const text = blockText(leftBlock) + blockText(rightBlock)
-  console.debug({ text })
 
   const block = newBlock([newPart(text)])
 
@@ -55,6 +54,11 @@ export function mergeBlocks (document, leftBlockIndex, rightBlockIndex) {
   document.splice(rightBlockIndex, 1)
 
   return { newBlock: block }
+}
+
+export function deleteBlockIndexRange (document, leftBlockIndex, rightBlockIndex) {
+  const amount = rightBlockIndex - leftBlockIndex + 1
+  document.splice(leftBlockIndex, amount)
 }
 
 export function deleteRange (document, leftBlock, leftPos, rightBlock, rightPos) {
@@ -75,8 +79,6 @@ export function deleteRange (document, leftBlock, leftPos, rightBlock, rightPos)
 
     let text = leftText.slice(0, leftPos) + rightText.slice(rightPos)
 
-    console.debug({ text })
-
     // TODO: scan line
     const newFocusBlock = newBlock([newPart(text)])
 
@@ -92,7 +94,7 @@ export function deleteRange (document, leftBlock, leftPos, rightBlock, rightPos)
   }
 }
 
-function findBlockIndex (document, cid) {
+export function findBlockIndex (document, cid) {
   // we allow one to pass a block or a block id
   if (cid._cid !== undefined) { cid = cid._cid }
 
