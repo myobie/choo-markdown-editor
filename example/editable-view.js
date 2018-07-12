@@ -142,6 +142,12 @@ export default (state, emit) => {
       return
     }
 
+    if (code === 'Tab') {
+      e.preventDefault()
+      emit('key:tab', e)
+      return
+    }
+
     // NOTE: Maybe we need to emit something so we can potentially scroll the view?
     // if (code === 'ArrowUp') {
     //   e.preventDefault()

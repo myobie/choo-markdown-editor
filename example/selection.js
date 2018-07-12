@@ -26,7 +26,11 @@ export function el (blockID, partIndex) {
 
 export function setCaret (block, pos) {
   const { index, offset } = findPosInBlock(block, pos)
-  const _el = el(block._cid, index)
+  setCaretExactly(block, index, offset)
+}
+
+export function setCaretExactly (block, partIndex, offset) {
+  const _el = el(block._cid, partIndex)
   const _sel = sel()
 
   if (_el.childNodes.length !== 1) {
@@ -38,6 +42,19 @@ export function setCaret (block, pos) {
   console.debug('setting caret', _el, textNode, offset)
 
   _sel.collapse(textNode, offset)
+}
+
+export function next (state) {
+  const nextSelection = state.nextSelection
+  state.nextSelection = null
+
+  if (nextSelection) {
+    if (nextSelection.isCollapsed) {
+      setCaretExactly(nextSelection.focusBlock, nextSelection.focusPartIndex, nextSelection.focusPartOffset)
+    } else {
+      console.error('cannot set next selection to range yet')
+    }
+  }
 }
 
 export function current () {

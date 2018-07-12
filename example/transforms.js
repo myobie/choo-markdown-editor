@@ -18,17 +18,27 @@ export function replaceBlockAt (document, block, index) {
 
 export function splitBlock (document, block, pos) {
   const blockIndex = findBlockIndex(document, block)
+  console.debug({ blockIndex })
   const _text = blockText(block)
 
   let leftText = _text.slice(0, pos)
-  let rightText = _text.slice(pos + 1, -1)
+  let rightText = _text.slice(pos)
+
+  console.debug('leftText', leftText, 'rightText', rightText)
 
   // TODO: scanLine
+  // TODO: if a block had a style (like code or bullet) then copy that style
+  //       and possibly a prefix to the new right block from the left
   const left = newBlock([newPart(leftText)])
   const right = newBlock([newPart(rightText)])
 
   replaceBlockAt(document, left, blockIndex)
   insertBlockAfter(document, right, blockIndex)
+
+  return {
+    replacementBlock: left,
+    newBlock: right
+  }
 }
 
 export function deleteRange (document, leftBlock, leftPos, rightBlock, rightPos) {
@@ -62,5 +72,8 @@ export function deleteRange (document, leftBlock, leftPos, rightBlock, rightPos)
 }
 
 function findBlockIndex (document, cid) {
+  // we allow one to pass a block or a block id
+  if (cid._cid !== undefined) { cid = cid._cid }
+
   return document.findIndex(b => b._cid === cid)
 }

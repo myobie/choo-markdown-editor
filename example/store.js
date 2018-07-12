@@ -10,6 +10,7 @@ export default (state, emitter) => {
   state.document = testDocument
   state.selection = null
   state.isEditing = false
+  state.nextSelection = null
 
   emitter.on('focus', () => {
     state.isEditing = true
@@ -21,6 +22,7 @@ export default (state, emitter) => {
   emitter.on('blur', () => {
     state.isEditing = false
     state.selection = null
+    state.nextSelection = null
   })
 
   emitter.on('selection:update', update => {
@@ -34,6 +36,10 @@ export default (state, emitter) => {
   const nbspRegExp = /^.+&nbsp;$/
 
   emitter.on('slurp', () => {
+    if (!state.selection.isCollapsed) {
+      console.error('cannot slurp after input during a range selection yet')
+    }
+
     const block = state.selection.focusBlock
     const index = state.selection.focusPartIndex
     const part = state.selection.focusPart
@@ -69,9 +75,7 @@ export default (state, emitter) => {
 
   emitter.on('key:return', () => {
     keyReturn(state)
-    render(() => {
-      selection.setCaret(state.selection.focusBlock, 0)
-    })
+    render()
   })
 
   // just in case
@@ -87,6 +91,13 @@ export default (state, emitter) => {
     if (cb && typeof cb === 'function') {
       emitter.once(state.events.RENDER, () => {
         raf(cb)
+      })
+    }
+
+    // if there is a next selection queued up, then go ahead and make it happen
+    if (state.nextSelection) {
+      emitter.once(state.events.RENDER, () => {
+        raf(() => { selection.next(state) })
       })
     }
 
