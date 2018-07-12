@@ -34,7 +34,7 @@ export function setCaretExactly (block, partIndex, offset) {
   const _sel = sel()
 
   if (_el.childNodes.length !== 1) {
-    console.error('this part has more than one text node which means something has gone very wrong')
+    console.error('this part has more than one text node which means something has gone very wrong', _el.childNodes)
   }
 
   const textNode = _el.childNodes[0]
@@ -50,7 +50,11 @@ export function next (state) {
 
   if (nextSelection) {
     if (nextSelection.isCollapsed) {
-      setCaretExactly(nextSelection.focusBlock, nextSelection.focusPartIndex, nextSelection.focusPartOffset)
+      if (nextSelection.focusBlock && nextSelection.focusPos) {
+        setCaret(nextSelection.focusBlock, nextSelection.focusPos)
+      } else {
+        setCaretExactly(nextSelection.focusBlock, nextSelection.focusPartIndex, nextSelection.focusPartOffset)
+      }
     } else {
       console.error('cannot set next selection to range yet')
     }

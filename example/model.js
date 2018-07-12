@@ -1,8 +1,8 @@
 // import { scanLine } from './scan-line'
 
 export function reScanBlock (block) {
-  const text = block.parts.map(p => p.text).join('')
-  const expectedLength = block.parts.reduce((acc, p) => acc + p.length, 0)
+  const text = blockText(block)
+  const expectedLength = blockLength(block)
 
   // TODO: use assert
   if (text.length !== expectedLength) {
@@ -35,6 +35,10 @@ export function newBlock (children) {
 
 export function blockText (block) {
   return block.parts.reduce((acc, p) => acc + p.text, '')
+}
+
+export function blockLength (block) {
+  return block.parts.reduce((acc, p) => acc + p.length, 0)
 }
 
 export function isSameBlock (left, right) {

@@ -118,6 +118,8 @@ export default (state, emit) => {
     const code = e.code
     // TODO: assign code from e.keyCode if e.code is missing
 
+    // NOTE: do we always want to capture backspace or only when we are at the
+    //       very beginning of a block?
     if (code === 'Backspace' || (browser.isMac && code === 'keyH' && e.ctrlKey)) {
       e.preventDefault()
       emit('key:backspace', e)

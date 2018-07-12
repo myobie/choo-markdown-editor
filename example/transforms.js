@@ -41,33 +41,54 @@ export function splitBlock (document, block, pos) {
   }
 }
 
+export function mergeBlocks (document, leftBlockIndex, rightBlockIndex) {
+  const leftBlock = document[leftBlockIndex]
+  const rightBlock = document[rightBlockIndex]
+
+  const text = blockText(leftBlock) + blockText(rightBlock)
+  console.debug({ text })
+
+  const block = newBlock([newPart(text)])
+
+  replaceBlockAt(document, block, leftBlockIndex)
+
+  document.splice(rightBlockIndex, 1)
+
+  return { newBlock: block }
+}
+
 export function deleteRange (document, leftBlock, leftPos, rightBlock, rightPos) {
   if (isSameBlock(leftBlock, rightBlock)) {
     const index = findBlockIndex(document, leftBlock)
     let text = blockText(leftBlock)
-    text = text.slice(0, leftPos) + text.slice(rightPos, -1)
+    text = text.slice(0, leftPos) + text.slice(rightPos)
     const block = newBlock([newPart(text)])
     replaceBlockAt(document, block, index)
+
+    return { newBlock: block }
   } else {
-    const leftIndex = findBlockIndex(leftBlock)
-    const rightIndex = findBlockIndex(rightBlock)
+    const leftIndex = findBlockIndex(document, leftBlock)
+    const rightIndex = findBlockIndex(document, rightBlock)
 
     let leftText = blockText(leftBlock)
-    leftText = leftText.slice(0, leftPos)
-    const newLeftBlock = newBlock([newPart(leftText)])
-
     let rightText = blockText(rightBlock)
-    rightText = rightText.slice(0, rightPos)
-    const newRightBlock = newBlock([newPart(rightText)])
 
-    replaceBlockAt(document, newLeftBlock, leftIndex)
-    replaceBlockAt(document, newRightBlock, rightIndex)
+    let text = leftText.slice(0, leftPos) + rightText.slice(rightPos)
+
+    console.debug({ text })
+
+    // TODO: scan line
+    const newFocusBlock = newBlock([newPart(text)])
+
+    replaceBlockAt(document, newFocusBlock, leftIndex)
 
     const diff = rightIndex - leftIndex
 
     if (diff > 0) {
-      document.splice(leftIndex, diff)
+      document.splice(leftIndex + 1, diff)
     }
+
+    return { newBlock: newFocusBlock }
   }
 }
 

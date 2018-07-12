@@ -1,7 +1,7 @@
 import { document as testDocument } from './test-document'
 import { raf } from './raf'
 import * as selection from './selection'
-import { keyReturn } from './keypress'
+import { keyBackspace, keyReturn } from './keypress'
 import { updatePart, reScanBlock } from './model'
 import { replacePart } from './transforms'
 import { isArrayEqual } from './array-utils'
@@ -75,6 +75,11 @@ export default (state, emitter) => {
 
   emitter.on('key:return', () => {
     keyReturn(state)
+    render()
+  })
+
+  emitter.on('key:backspace', () => {
+    keyBackspace(state)
     render()
   })
 
