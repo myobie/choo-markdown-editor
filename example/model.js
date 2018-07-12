@@ -1,6 +1,6 @@
-import { scanLine } from './scan-line'
+// import { scanLine } from './scan-line'
 
-export function scanBlock (block) {
+export function reScanBlock (block) {
   const text = block.parts.map(p => p.text).join('')
   const expectedLength = block.parts.reduce((acc, p) => acc + p.length, 0)
 
@@ -9,25 +9,16 @@ export function scanBlock (block) {
     console.error('the concatted text is not the same length as the calculated combined lengths', text.length, expectedLength)
   }
 
-  const results = scanLine(text)
+  // TODO: actually use scan-line
+  block.parts = [newPart(text)]
+}
 
-  const newParts = []
-
-  results.forEach(style => {
-    newParts.push({
-      type: 'text',
-      styleType: style.styleType,
-      styleSubType: style.styleSubType,
-      text: style.text,
-      length: style.length
-    })
-  })
-
-  return newParts
+export function updatePart (part, text, attrs = {}) {
+  return Object.assign({}, part, attrs, { text, length: text.length })
 }
 
 export function newPart (text, attrs = {}) {
-  return Object.assign({ styleType: 'plain' }, attrs, { text, length: text.length })
+  return Object.assign({ styles: [] }, attrs, { text, length: text.length })
 }
 
 export function newEmptyBlock () {

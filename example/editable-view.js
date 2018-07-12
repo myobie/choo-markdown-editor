@@ -26,14 +26,14 @@ const styles = css`
   }
 `
 
-function classesForStyle (style) {
-  if (style === 'plain') { return '' }
-  if (style === 'bold') { return 'b' }
-  if (style === 'italic') { return 'i' }
-  if (style === 'link') { return 'underline' }
+function classesForStyle (styles) {
+  let classes = []
 
-  console.error('do not understand style', style)
-  return ''
+  if (styles.includes('bold')) { classes.push('b') }
+  if (styles.includes('italic')) { classes.push('i') }
+  if (styles.includes('link')) { classes.push('underline') }
+
+  return classes.join(' ')
 }
 
 function content (block, emit) {
@@ -44,7 +44,7 @@ function content (block, emit) {
       text = raw('&nbsp;')
     }
 
-    const additionalClasses = classesForStyle(part.styleType)
+    const additionalClasses = classesForStyle(part.styles)
 
     return html`
       <pre class="di ${additionalClasses}" data-part=true data-part-type="text" data-index=${index} data-length=${part.text.length}>${text}</pre>
@@ -142,29 +142,30 @@ export default (state, emit) => {
       return
     }
 
-    if (code === 'ArrowUp') {
-      e.preventDefault()
-      emit('key:up', e)
-      return
-    }
-
-    if (code === 'ArrowRight') {
-      e.preventDefault()
-      emit('key:right', e)
-      return
-    }
-
-    if (code === 'ArrowDown') {
-      e.preventDefault()
-      emit('key:down', e)
-      return
-    }
-
-    if (code === 'ArrowLeft') {
-      e.preventDefault()
-      emit('key:left', e)
-      return
-    }
+    // NOTE: Maybe we need to emit something so we can potentially scroll the view?
+    // if (code === 'ArrowUp') {
+    //   e.preventDefault()
+    //   emit('key:up', e)
+    //   return
+    // }
+    //
+    // if (code === 'ArrowRight') {
+    //   e.preventDefault()
+    //   emit('key:right', e)
+    //   return
+    // }
+    //
+    // if (code === 'ArrowDown') {
+    //   e.preventDefault()
+    //   emit('key:down', e)
+    //   return
+    // }
+    //
+    // if (code === 'ArrowLeft') {
+    //   e.preventDefault()
+    //   emit('key:left', e)
+    //   return
+    // }
 
     if ((e.code === 'KeyV' && e.ctrlKey) || (browser.isMac && e.code === 'KeyV' && e.metaKey === true)) {
       e.preventDefault()

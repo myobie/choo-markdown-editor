@@ -2,6 +2,9 @@ import { document as testDocument } from './test-document'
 import { raf } from './raf'
 import * as selection from './selection'
 import { keyReturn } from './keypress'
+import { updatePart, reScanBlock } from './model'
+import { replacePart } from './transforms'
+import { isArrayEqual } from './array-utils'
 
 export default (state, emitter) => {
   state.document = testDocument
@@ -28,72 +31,41 @@ export default (state, emitter) => {
     selection.setCaret(block, pos)
   })
 
-  // const nbspRegExp = /^.+&nbsp;$/
+  const nbspRegExp = /^.+&nbsp;$/
 
   emitter.on('slurp', () => {
-    // const block = state.selection.focusBlock
-    // const index = state.selection.focusPartIndex
-    // const part = state.selection.focusPart
-    // const partEl = selection.el(block, index)
-    // let text = partEl.innerText
-    //
-    // // there is only one empty text part, which means we are rendering it funny
-    // if (block.parts.length === 1 && index === 0 && part.text === '') {
-    //   const html = partEl.innerHTML
-    //
-    //   if (text.length > 1 && html.match(nbspRegExp)) {
-    //     text = text.substr(0, text.length - 1)
-    //
-    //     part.text = text
-    //     part.length = text.length
-    //
-    //     render(() => {
-    //       selection.setCaret(block, index, text.length)
-    //     })
-    //   }
-    // } else {
-    //   const scanResults = scanLine(text)
-    //   let needToResetBlock = false
-    //
-    //   if (scanResults.length === 0) {
-    //     console.error('scanLine returns zero results which should be impossible')
-    //   } else if (scanResults.length === 1) {
-    //     const result = scanResults[0]
-    //     if (part.styleType !== result.styleType) {
-    //       needToResetBlock = true
-    //     }
-    //   } else {
-    //     needToResetBlock = true
-    //   }
-    //
-    //   if (needToResetBlock) {
-    //     const currentPos = currentBlockPos()
-    //     const oldPartLength = part.length
-    //
-    //     part.text = text
-    //     part.length = text.length
-    //
-    //     const lengthDifference = part.length - oldPartLength
-    //
-    //     resetBlock(block, currentPos, lengthDifference)
-    //   } else {
-    //     part.text = text
-    //     part.length = text.length
-    //   }
-    // }
-  })
+    const block = state.selection.focusBlock
+    const index = state.selection.focusPartIndex
+    const part = state.selection.focusPart
+    const partEl = selection.el(block, index)
+    let text = partEl.innerText
+    const html = partEl.innerHTML
 
-  // function currentBlockPos () {
-  //   if (state.selection.isCollapsed) {
-  //     return posInBlockAtPartAndOffset(
-  //       state.selection.focusBlock,
-  //       state.selection.focusPartIndex,
-  //       state.selection.focusPartOffset
-  //     )
-  //   } else {
-  //     console.error('do not support range selections for finding block pos yet')
-  //   }
-  // }
+    if (text.length > 1 && html.match(nbspRegExp)) {
+      text = text.substr(0, text.length - 1)
+    }
+
+    const newPart = updatePart(part, text)
+    replacePart(block, newPart, index)
+
+    const oldParts = block.parts
+
+    // mutate the block to have new parts from our markdown scanning
+    reScanBlock(block)
+
+    const oldPartsSummary = oldParts.map(p => {
+      return [p.type].concat(p.styles)
+    })
+
+    const newPartsSummary = block.parts.map(p => {
+      return [p.type].concat(p.styles)
+    })
+
+    if (!isArrayEqual(oldPartsSummary, newPartsSummary)) {
+      console.debug('the structure of the block has changed, so rendering')
+      render()
+    }
+  })
 
   emitter.on('key:return', () => {
     keyReturn(state)

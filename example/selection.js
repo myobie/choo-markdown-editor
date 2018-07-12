@@ -5,7 +5,15 @@ export function sel () {
 }
 
 export function el (blockID, partIndex) {
+  // We allow people to pass in a block or block id
+  if (blockID._cid !== undefined) { blockID = blockID._cid }
+
   const blockEl = document.querySelector(`#editor [data-block][data-cid="${blockID}"]`)
+
+  if (!blockEl) {
+    console.error('Could not find the block element', { blockID })
+    return null
+  }
 
   if (partIndex === undefined) {
     return blockEl

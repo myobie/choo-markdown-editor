@@ -1,5 +1,9 @@
 import { newBlock, newPart, isSameBlock, blockText } from './model'
 
+export function replacePart (block, part, index) {
+  block.parts.splice(index, 1, part)
+}
+
 export function insertBlockBefore (document, block, index) {
   document.splice(index, 0, block)
 }

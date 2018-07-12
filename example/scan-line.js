@@ -78,6 +78,8 @@ export function scanLine (text) {
     }
   }
 
+  // TODO: actually build parts and blocks here, no need to pretend we are not related
+
   let match
   while ((match = stylesRegex.exec(text)) !== null) {
     const matchedCharacters = match[0]
